@@ -1,0 +1,33 @@
+package chapter5
+
+import chapter5.LazyList
+
+@main def main: Any =
+  val l = LazyList(1, 2, 3, 4)
+  println(l.toList)
+  println(l.take(2).toList)
+  println(l.drop(2).toList)
+  println(l.takeWhile(_ < 3).toList)
+  println(l.forAll(_ < 3))
+  println(l.forAll(_ < 5))
+  println(l.takeWhileViaFold(_ < 3).toList)
+  println(l.headOption)
+  println(l.map(_ + 1).toList)
+  println(l.filter(_ != 2).toList)
+  println(l.append(LazyList(5)).toList)
+  println(l.flatMap(x => LazyList(x, x + 1, x + 2)).toList)
+  println(LazyList.fibs().take(7).toList)
+  println(LazyList.onesViaUnfold.take(4).toList)
+  println(LazyList.continuallyViaUnfold(2).take(4).toList)
+  println(LazyList.fromViaUnfold(2).take(4).toList)
+  println(LazyList.fibsViaUnfold().take(7).toList)
+  println(l.mapViaUnfold(_ + 1).toList)
+  println(l.takeViaUnfold(3).toList)
+  println(l.takeWhileViaUnfold(_ < 3).toList)
+  println(l.zipWith(LazyList(1, 2, 3), _ + _).toList)
+  println(l.zipAll(LazyList(1, 2, 3)).toList)
+  println(l.startsWith(LazyList(1, 2, 3)))
+  println(l.startsWith(LazyList(2, 3)))
+  println(l.tails.map(_.toList).toList)
+  println(l.scanLeft(0)(_ + _).toList)
+  println(LazyList(1, 2, 3).scanRight(0)(_ + _).toList)
