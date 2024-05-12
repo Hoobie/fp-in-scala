@@ -16,6 +16,59 @@ object Par:
   def unit[A](a: A): Par[A] = es => UnitFuture(a)
 
   // provided
+  def fork[A](a: => Par[A]): Par[A] =
+    es =>
+      es.submit(new Callable[A] {
+        def call = a(es).get
+      })
+
+  def lazyUnit[A](a: => A): Par[A] = fork(unit(a))
+
+  def asyncF[A, B](f: A => B): A => Par[B] =
+    a => lazyUnit(f(a))
+
+  def sequence[A](ps: List[Par[A]]): Par[List[A]] =
+    ps.foldLeft(Par.unit(List.empty[A])) { case (acc, pa) =>
+      acc.map2(pa)(_ :+ _)
+    }
+
+  // provided
+  def parMap[A, B](ps: List[A])(f: A => B): Par[List[B]] =
+    fork:
+      val fbs: List[Par[B]] = ps.map(asyncF(f))
+      sequence(fbs)
+
+  def parFilter[A](as: List[A])(f: A => Boolean): Par[List[A]] =
+    fork:
+      parMap(as.filter(f))(identity)
+
+  // provided
+  def sum(ints: IndexedSeq[Int]): Par[Int] =
+    if ints.size <= 1 then Par.unit(ints.headOption.getOrElse(0))
+    else
+      val (l, r) = ints.splitAt(ints.size / 2)
+      Par.fork(sum(l)).map2(Par.fork(sum(r)))(_ + _)
+
+  def parFold[A](seq: IndexedSeq[A], default: A)(combine: (A, A) => A): Par[A] =
+    if seq.size <= 1 then Par.unit(seq.headOption.getOrElse(default))
+    else
+      val (l, r) = seq.splitAt(seq.size / 2)
+      Par
+        .fork(parFold(l, default)(combine))
+        .map2(Par.fork(parFold(r, default)(combine)))(combine)
+
+  def max(ints: IndexedSeq[Int]): Par[Int] =
+    parFold(ints, Int.MinValue)(Math.max)
+
+  def words(paragraphs: List[String]): Par[Long] =
+    fork:
+      parMap(paragraphs)(_.split(" ").length).map(_.sum)
+
+  def parCompute[A, B](items: List[A])(f: A => B)(combine: List[B] => B) =
+    fork:
+      parMap(items)(f).map(combine)
+
+  // provided
   private case class UnitFuture[A](get: A) extends Future[A]:
     def isDone = true
     def get(timeout: Long, units: TimeUnit) = get
@@ -30,7 +83,7 @@ object Par:
         val futureB = pb(es)
         UnitFuture(f(futureA.get, futureB.get))
 
-    def map2Timingout[B, C](pb: Par[B])(f: (A, B) => C): Par[C] =
+    def map2TimingOut[B, C](pb: Par[B])(f: (A, B) => C): Par[C] =
       es =>
         new Future[C] {
           val fa = pa(es)
@@ -56,9 +109,11 @@ object Par:
           override def get(): C = f(fa.get, fb.get)
         }
 
-  // provided
-  def fork[A](a: => Par[A]): Par[A] =
-    es =>
-      es.submit(new Callable[A] {
-        def call = a(es).get
-      })
+    // provided
+    def map[B](f: A => B): Par[B] =
+      pa.map2(unit(()))((a, _) => f(a))
+
+    def map3[B, C, D](pb: Par[B], pc: Par[C])(f: (A, B, C) => D): Par[D] =
+      pa.map2(pb)(_ -> _).map2(pc) {
+        case ((a, b), c) => f(a, b, c)
+      }
