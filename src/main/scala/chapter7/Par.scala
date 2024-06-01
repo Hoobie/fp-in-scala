@@ -40,7 +40,9 @@ object Par:
 
   def parFilter[A](as: List[A])(f: A => Boolean): Par[List[A]] =
     fork:
-      parMap(as.filter(f))(identity)
+      parMap(as){ a =>
+        if (f(a)) List(a) else List.empty
+      }.map(_.flatten)
 
   // provided
   def sum(ints: IndexedSeq[Int]): Par[Int] =
