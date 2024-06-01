@@ -11,6 +11,12 @@ opaque type Par[A] = ExecutorService => Future[A]
 // provided
 extension [A](pa: Par[A]) def run(s: ExecutorService): Future[A] = pa(s)
 
+extension [A](pa: Par[A])
+  def chooser[B](choices: A => Par[B]): Par[B] =
+    es =>
+      val choice = pa.run(es).get
+      choices(choice).run(es)
+
 object Par:
   // provided
   def unit[A](a: A): Par[A] = es => UnitFuture(a)
@@ -40,7 +46,7 @@ object Par:
 
   def parFilter[A](as: List[A])(f: A => Boolean): Par[List[A]] =
     fork:
-      parMap(as){ a =>
+      parMap(as) { a =>
         if (f(a)) List(a) else List.empty
       }.map(_.flatten)
 
@@ -69,6 +75,22 @@ object Par:
   def parCompute[A, B](items: List[A])(f: A => B)(combine: List[B] => B) =
     fork:
       parMap(items)(f).map(combine)
+
+  def choiceN[A](n: Par[Int])(choices: List[Par[A]]): Par[A] =
+    es =>
+      val index = n.run(es).get % choices.size
+      choices(index).run(es)
+
+  def choice[A](cond: Par[Boolean])(t: Par[A], f: Par[A]): Par[A] =
+    choiceN(cond.map(bool => if (bool) 0 else 1))(List(t, f))
+
+  def choiceMap[K, V](key: Par[K])(choices: Map[K, Par[V]]): Par[V] =
+    es =>
+      val choice = key.run(es).get
+      choices(choice).run(es)
+
+  def join[A](ppa: Par[Par[A]]): Par[A] = 
+    es => ppa(es).get.apply(es)
 
   // provided
   private case class UnitFuture[A](get: A) extends Future[A]:
@@ -116,6 +138,9 @@ object Par:
       pa.map2(unit(()))((a, _) => f(a))
 
     def map3[B, C, D](pb: Par[B], pc: Par[C])(f: (A, B, C) => D): Par[D] =
-      pa.map2(pb)(_ -> _).map2(pc) {
-        case ((a, b), c) => f(a, b, c)
+      pa.map2(pb)(_ -> _).map2(pc) { case ((a, b), c) =>
+        f(a, b, c)
       }
+
+    def flatMap[B](f: A => Par[B]): Par[B] =
+      Par.join(pa.map(f))
