@@ -5,6 +5,7 @@ import chapter6.RNG
 
 // provided
 opaque type Gen[+A] = State[RNG, A]
+type SGen[+A] = Int => Gen[A]
 
 object Gen {
   def choose(start: Int, stopExclusive: Int): Gen[Int] =
@@ -24,16 +25,22 @@ object Gen {
     }
 
   extension [A](self: Gen[A])
+    def run(rng: RNG) = self.run(rng)
+
     def listOfN(n: Int): Gen[List[A]] =
       State.sequence(List.fill(n)(self))
 
-  extension [A](self: Gen[A])
     def flatMap[B](f: A => Gen[B]): Gen[B] =
       self.flatMap(f)
 
-  extension [A](self: Gen[A])
     def listOfN(size: Gen[Int]): Gen[List[A]] =
       size.flatMap(n => listOfN(n))
+
+    def unsized: SGen[A] = _ => self
+
+    def list: SGen[List[A]] = size => self.listOfN(size)
+
+    def nonEmptyList: SGen[List[A]] = size => self.listOfN(size.max(1))
 
   def union[A](g1: Gen[A], g2: Gen[A]): Gen[A] =
     boolean.flatMap(bool => if (bool) g1 else g2)
