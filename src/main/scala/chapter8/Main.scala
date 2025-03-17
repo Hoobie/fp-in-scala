@@ -18,3 +18,17 @@ import chapter6.SimpleRNG
     l.forall(_ <= max)
 
   maxProp.run()
+
+  val sortProp = Prop.forAll(smallInt.list)(l => l.sorted == l.sorted.sorted) &&
+    Prop.forAll(smallInt.nonEmptyList) { l =>
+      if (l.isEmpty)
+        l.sorted.isEmpty
+      else if (l.sizeIs == 1)
+        l.sorted == l
+      else
+        l.zip(Int.MaxValue :: l.tail)
+          .map { case (a, b) => a <= b }
+          .reduce(_ && _)
+    } && Prop.forAll(smallInt.list)(l => l.forall(l.sorted.contains))
+
+  sortProp.run()
