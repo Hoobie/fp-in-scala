@@ -8,16 +8,16 @@ import java.util.concurrent.Callable
 // provided
 opaque type Par[A] = ExecutorService => Future[A]
 
-// provided
-extension [A](pa: Par[A]) def run(s: ExecutorService): Future[A] = pa(s)
-
-extension [A](pa: Par[A])
-  def chooser[B](choices: A => Par[B]): Par[B] =
-    es =>
-      val choice = pa.run(es).get
-      choices(choice).run(es)
-
 object Par:
+  // provided
+  extension [A](pa: Par[A]) def run(s: ExecutorService): Future[A] = pa(s)
+
+  extension [A](pa: Par[A])
+    def chooser[B](choices: A => Par[B]): Par[B] =
+      es =>
+        val choice = pa.run(es).get
+        choices(choice).run(es)
+
   // provided
   def unit[A](a: A): Par[A] = es => UnitFuture(a)
 
@@ -89,8 +89,12 @@ object Par:
       val choice = key.run(es).get
       choices(choice).run(es)
 
-  def join[A](ppa: Par[Par[A]]): Par[A] = 
+  def join[A](ppa: Par[Par[A]]): Par[A] =
     es => ppa(es).get.apply(es)
+
+  // provided
+  def equal[A](p: Par[A], p2: Par[A]): Par[Boolean] =
+    p.map2(p2)(_ == _)
 
   // provided
   private case class UnitFuture[A](get: A) extends Future[A]:

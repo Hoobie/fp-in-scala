@@ -2,6 +2,9 @@ package chapter8
 
 import chapter6.RNG
 import chapter6.SimpleRNG
+import chapter7.Par
+import java.util.concurrent.Executors
+import java.util.concurrent.ExecutorService
 
 // provided
 opaque type Prop = (MaxSize, TestCases, RNG) => Result
@@ -41,6 +44,12 @@ extension (self: Prop)
 
 object Prop:
   // provided
+  val executors: Gen[ExecutorService] = Gen.weighted(
+    Gen.choose(1, 4).map(Executors.newFixedThreadPool(_)) -> .75,
+    Gen.unit(Executors.newCachedThreadPool) -> .25
+  )
+
+  // provided
   def forAll[A](gen: SGen[A])(f: A => Boolean): Prop =
     (max, n, rng) =>
       val casesPerSize = (n.toInt - 1) / max.toInt + 1
@@ -74,6 +83,10 @@ object Prop:
         .getOrElse(Result.Passed)
 
   // provided
+  def forAllPar[A](g: Gen[A])(f: A => Par[Boolean]): Prop =
+    forAll(executors.map2(g)((_, _)))((s, a) => f(a).run(s).get)
+
+  // provided
   def randomLazyList[A](gen: Gen[A])(rng: RNG): LazyList[A] =
     LazyList.unfold(rng)(rng => Some(gen.run(rng)))
 
@@ -82,6 +95,10 @@ object Prop:
     s"test case: $s\n" +
       s"generated an exception: ${e.getMessage}\n" +
       s"stack trace:\n ${e.getStackTrace.mkString("\n")}"
+
+  // provided
+  def verify(p: => Boolean): Prop =
+    (_, _, _) => if p then Result.Passed else Result.Falsified("()", 0)
 
 // provided
 opaque type TestCases = Int

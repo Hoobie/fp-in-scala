@@ -30,6 +30,12 @@ object Gen {
     def listOfN(n: Int): Gen[List[A]] =
       State.sequence(List.fill(n)(self))
 
+    def map[B](f: A => B): Gen[B] =
+      self.map(f)
+
+    def map2[B, C](gb: Gen[B])(f: (A, B) => C): Gen[C] =
+      self.map2(gb)(f)
+
     def flatMap[B](f: A => Gen[B]): Gen[B] =
       self.flatMap(f)
 
